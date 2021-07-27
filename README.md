@@ -2,16 +2,15 @@
 
 #### 介绍
 A simple Alibaba Nacos C++ client
-
-#### 软件架构
-软件架构说明
-
+Nacos 初始化后会启动一个线程用于发送心跳和获取服务实例。
 
 #### 安装教程
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1.  sudo apt install libcpprest2.10
+2.  mkdir build
+3.  cd build
+4.  cmake ..
+5.  make
 
 #### 使用说明
 
