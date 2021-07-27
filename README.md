@@ -2,9 +2,6 @@
 
 #### 介绍
 A simple Alibaba Nacos C++ client
-- Nacos 初始化后会启动一个线程用于发送心跳和获取服务实例；
-- 调用 Nacos::require 获取一个可用的服务实例；
-- 首次获取指定服务实例后，该服务会被加入定时刷新队列。
 
 #### 安装教程
 
@@ -16,9 +13,9 @@ A simple Alibaba Nacos C++ client
 
 #### 使用说明
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+- Nacos 初始化后会启动一个线程用于发送心跳和获取服务实例；
+- 调用 Nacos::require 获取一个可用的服务实例；
+- 首次获取指定服务实例后，该服务会被加入定时刷新队列。
 
 #### 参与贡献
 
