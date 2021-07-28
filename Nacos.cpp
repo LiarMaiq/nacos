@@ -35,11 +35,13 @@ void Nacos::listServices()
 {
     for (auto& ms : m_microServices)
     {
+        if (m_logger)
+                m_logger(40000, ms.first + ":");
         std::vector<std::pair<std::string, bool> > mss = ms.second.gets();
         for (size_t i = 0; i < mss.size(); i++)
         {
             if (m_logger)
-                m_logger(40000, mss[i].first + (mss[i].second ? " 1" : " 0"));
+                m_logger(40000, "   " + mss[i].first + (mss[i].second ? "   true" : "  false"));
         }
     }
 }
@@ -70,21 +72,24 @@ void Nacos::run()
     while (!m_stopping)
     {
         // beat
-        for (const std::string &item : m_cfg.addrs)
+        if (!m_cfg.serviceName.empty() && !m_cfg.callback.empty())
         {
-            web::uri u = uri_builder("http://" + item + "/nacos/v1/ns/instance/beat")
-                             .append_query<string_t>("serviceName", m_cfg.serviceName)
-                             .append_query<string_t>("beat", beat)
-                             .to_uri();
-            http_client client(u, client_config);
-            try
+            for (const std::string &item : m_cfg.addrs)
             {
-                client.request(methods::PUT).wait();
-            }
-            catch (std::exception const &e)
-            {
-                if (m_logger)
-                    m_logger(40000, conversions::to_string_t("Nacos ") + u.to_string() + conversions::to_string_t(" heartbeat exception:") + conversions::to_string_t(e.what()));
+                web::uri u = uri_builder("http://" + item + "/nacos/v1/ns/instance/beat")
+                                .append_query<string_t>("serviceName", m_cfg.serviceName)
+                                .append_query<string_t>("beat", beat)
+                                .to_uri();
+                http_client client(u, client_config);
+                try
+                {
+                    client.request(methods::PUT).wait();
+                }
+                catch (std::exception const &e)
+                {
+                    if (m_logger)
+                        m_logger(40000, conversions::to_string_t("Nacos ") + u.to_string() + conversions::to_string_t(" heartbeat exception:") + conversions::to_string_t(e.what()));
+                }
             }
         }
 

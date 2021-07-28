@@ -7,10 +7,10 @@
 
 struct ST_NACOS_CFG
 {
-    std::vector<std::string> addrs;
-    int beatTime;
-    std::string serviceName;
-    std::string callback;
+    std::vector<std::string> addrs; // 10.29.195.12:8847
+    int beatTime;                   // second
+    std::string serviceName;        // service name register to nacos
+    std::string callback;           // service addr register to nacos: 10.49.87.100:8200
 };
 
 class Nacos
