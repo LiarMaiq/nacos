@@ -3,8 +3,6 @@
 #include <vector>
 #include "cpprest/json.h"
 
-using namespace web;
-
 struct ST_MS_INSTANCE
 {
 	std::string ip;
@@ -14,7 +12,7 @@ struct ST_MS_INSTANCE
 	bool valid;
 	bool ephemeral;
 	bool marked;
-    json::value metadata;
+    web::json::value metadata;
 	std::string instanceId;
 	std::string serviceName;
 	std::string clusterName;
