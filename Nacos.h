@@ -37,4 +37,5 @@ private:
     bool m_stopping;
     std::function<void(int level, std::string log)> m_logger;
     ST_NACOS_CFG m_cfg;
+    std::map<std::string, bool> m_addrs;
 };

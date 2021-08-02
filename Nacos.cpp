@@ -22,6 +22,8 @@ Nacos::~Nacos()
 int Nacos::init(const ST_NACOS_CFG cfg)
 {
     m_cfg = cfg;
+    for (std::string addr : cfg.addrs)
+        m_addrs[addr] = false;
     m_future = std::async(std::launch::async, [this]()->void{this->run();});
     return 0;// In release no return will get "double free or corruption (fasttop)" error
 }
@@ -83,12 +85,12 @@ void Nacos::run()
                 http_client client(u, client_config);
                 try
                 {
-                    client.request(methods::PUT).wait();
+                    client.request(methods::PUT).then([this, item](http_response res){ m_addrs[item] = true; });
                 }
                 catch (std::exception const &e)
                 {
                     if (m_logger)
-                        m_logger(40000, conversions::to_string_t("Nacos ") + u.to_string() + conversions::to_string_t(" heartbeat exception:") + conversions::to_string_t(e.what()));
+                        m_logger(40000, "Nacos " + u.to_string() + " heartbeat exception:" + e.what());
                 }
             }
         }
@@ -129,119 +131,120 @@ std::string Nacos::require(const std::string service)
     return m_microServices[service].get();
 }
 
+/*
+{
+    "cacheMillis":3000,
+    "checksum":"4ed1441a1950a11d913b4f62b4c2a525",
+    "clusters":"",
+    "dom":"approp-service",
+    "env":"",
+    "hosts":[{
+            "clusterName":"DEFAULT",
+            "enabled":true,
+            "ephemeral":false,
+            "healthy":false,
+            "instanceId":"10.49.87.88#8002#DEFAULT#DEFAULT_GROUP@@approp-service",
+            "ip":"10.49.87.88",
+            "marked":false,
+            "metadata":{
+                "preserved.register.source":"SPRING_CLOUD"
+            },
+            "port":8002,
+            "serviceName":"approp-service",
+            "valid":false,
+            "weight":1
+        }],
+    "lastRefTime":1627270340831,
+    "metadata":{},
+    "name":"DEFAULT_GROUP@@approp-service",
+    "useSpecifiedURL":false
+}
+*/
 void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>& instances)
 {
-    for (const std::string &item : m_cfg.addrs)
+    for (const auto &item : m_addrs)
     {
+        // skip unavailable nacos addr
+        if(!item.second)
+            continue;
+
         web::http::client::http_client_config client_config;
         client_config.set_timeout(seconds(3));
-        web::uri u = uri_builder("http://" + item + "/nacos/v1/ns/instance/list")
+        web::uri u = uri_builder("http://" + item.first + "/nacos/v1/ns/instance/list")
                         .append_query<string_t>("serviceName", service)
                         .to_uri();
         http_client client(u, client_config);
-        http_response res;
-        json::value body;
         try
         {
-            res = client.request(methods::GET).get();
-            body = res.extract_json().get();
+            json::value body = client.request(methods::GET).then([](http_response res) -> auto
+                                              { return res.extract_json(); }).get();
+            ST_MS_INSTANCE inst;
+            if (!body.is_null())
+            {
+                json::value hosts = body["hosts"];
+                if (!hosts.is_null() && hosts.is_array())
+                {
+                    for (size_t i = 0; i < hosts.size(); i++)
+                    {
+                        json::value &host = hosts.at(i);
+                        if (host.has_string_field("ip"))
+                            inst.ip = host["ip"].as_string();
+
+                        if (host.has_integer_field("port"))
+                            inst.port = host["port"].as_integer();
+
+                        if (host.has_boolean_field("healthy"))
+                            inst.healthy = host["healthy"].as_bool();
+
+                        if (host.has_boolean_field("enabled"))
+                            inst.enabled = host["enabled"].as_bool();
+
+                        if (host.has_boolean_field("valid"))
+                            inst.valid = host["valid"].as_bool();
+
+                        if (host.has_boolean_field("marked"))
+                            inst.marked = host["marked"].as_bool();
+
+                        if (host.has_boolean_field("ephemeral"))
+                            inst.ephemeral = host["ephemeral"].as_bool();
+
+                        if (host.has_string_field("instanceId"))
+                            inst.instanceId = host["instanceId"].as_string();
+
+                        if (host.has_string_field("clusterName"))
+                            inst.clusterName = host["clusterName"].as_string();
+
+                        if (host.has_string_field("serviceName"))
+                            inst.serviceName = host["serviceName"].as_string();
+
+                        if (host.has_double_field("weight"))
+                            inst.weight = host["weight"].as_double();
+
+                        if (host.has_field("metadata"))
+                            inst.metadata = host["metadata"];
+
+                        bool ext = false;
+                        for (size_t i = 0; i < instances.size(); i++)
+                        {
+                            if (instances[i] == inst)
+                            {
+                                ext = true;
+                                // update instance healthy = true
+                                if (inst.healthy)
+                                    instances[i].healthy = inst.healthy;
+                                break;
+                            }
+                        }
+                        if (!ext)
+                            instances.push_back(inst);
+                    }
+                }
+            }
         }
         catch (std::exception const &e)
         {
             if (m_logger)
-                m_logger(40000, "Nacos " + u.to_string() + " heartbeat exception:" + e.what());
-        }
-
-        /*
-        {
-            "cacheMillis":3000,
-            "checksum":"4ed1441a1950a11d913b4f62b4c2a525",
-            "clusters":"",
-            "dom":"approp-service",
-            "env":"",
-            "hosts":[{
-                    "clusterName":"DEFAULT",
-                    "enabled":true,
-                    "ephemeral":false,
-                    "healthy":false,
-                    "instanceId":"10.49.87.88#8002#DEFAULT#DEFAULT_GROUP@@approp-service",
-                    "ip":"10.49.87.88",
-                    "marked":false,
-                    "metadata":{
-                        "preserved.register.source":"SPRING_CLOUD"
-                    },
-                    "port":8002,
-                    "serviceName":"approp-service",
-                    "valid":false,
-                    "weight":1
-                }],
-            "lastRefTime":1627270340831,
-            "metadata":{},
-            "name":"DEFAULT_GROUP@@approp-service",
-            "useSpecifiedURL":false
-        }
-        */
-        ST_MS_INSTANCE inst;
-        if(!body.is_null())
-        {
-            json::value hosts = body["hosts"];
-            if (!hosts.is_null() && hosts.is_array())
-            {
-                for (size_t i=0;i<hosts.size();i++)
-                {
-                    json::value& host = hosts.at(i);
-                    if (host.has_string_field("ip"))
-                        inst.ip = host["ip"].as_string();
-
-                    if (host.has_integer_field("port"))
-                        inst.port = host["port"].as_integer();
-
-                    if (host.has_boolean_field("healthy"))
-                        inst.healthy = host["healthy"].as_bool();
-
-                    if (host.has_boolean_field("enabled"))
-                        inst.enabled = host["enabled"].as_bool();
-
-                    if (host.has_boolean_field("valid"))
-                        inst.valid = host["valid"].as_bool();
-
-                    if (host.has_boolean_field("marked"))
-                        inst.marked = host["marked"].as_bool();
-
-                    if (host.has_boolean_field("ephemeral"))
-                        inst.ephemeral = host["ephemeral"].as_bool();
-
-                    if (host.has_string_field("instanceId"))
-                        inst.instanceId = host["instanceId"].as_string();
-
-                    if (host.has_string_field("clusterName"))
-                        inst.clusterName = host["clusterName"].as_string();
-
-                    if (host.has_string_field("serviceName"))
-                        inst.serviceName = host["serviceName"].as_string();
-
-                    if (host.has_double_field("weight"))
-                        inst.weight = host["weight"].as_double();
-
-                    if (host.has_field("metadata"))
-                        inst.metadata = host["metadata"];
-
-                    bool ext = false;
-                    for (size_t i = 0; i < instances.size(); i++)
-                    {
-                        if (instances[i] == inst)
-                        {
-                            ext = true;
-                            // update instance healthy = true
-                            if (inst.healthy)
-                                instances[i].healthy = inst.healthy;
-                            break;
-                        }
-                    }
-                    if (!ext)
-                        instances.push_back(inst);
-                }
-            }
+                m_logger(40000, "Nacos " + u.to_string() + " instance list: " + e.what());
         }
     }
 }
