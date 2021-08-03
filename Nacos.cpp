@@ -22,8 +22,9 @@ Nacos::~Nacos()
 int Nacos::init(const ST_NACOS_CFG cfg)
 {
     m_cfg = cfg;
+    // No beat, addr is available by default
     for (std::string addr : cfg.addrs)
-        m_addrs[addr] = false;
+        m_addrs[addr] = (!cfg.beat);
     m_future = std::async(std::launch::async, [this]()->void{this->run();});
     return 0;// In release no return will get "double free or corruption (fasttop)" error
 }
@@ -74,7 +75,7 @@ void Nacos::run()
     while (!m_stopping)
     {
         // beat
-        if (!m_cfg.serviceName.empty() && !m_cfg.callback.empty())
+        if (!m_cfg.serviceName.empty() && !m_cfg.callback.empty() && m_cfg.beat)
         {
             for (const std::string &item : m_cfg.addrs)
             {
