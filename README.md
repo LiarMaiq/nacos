@@ -1,7 +1,7 @@
 # Nacos
 
 #### 介绍
-A simple Alibaba Nacos C++ client
+A simple and very easy to use Alibaba Nacos C++ client.
 
 #### 安装教程
 
