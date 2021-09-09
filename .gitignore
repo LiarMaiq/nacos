@@ -1,5 +1,11 @@
 # dir
 build
 .vscode
+vs/.vs
+vs/Debug
+vs/Release
+vs/x64
 
 # file
+/vs/Nacos.VC.VC.opendb
+/vs/Nacos.VC.db

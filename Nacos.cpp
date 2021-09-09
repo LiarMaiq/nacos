@@ -2,6 +2,9 @@
 #include "cpprest/http_client.h"
 #include "cpprest/http_msg.h"
 #include "MicroService.h"
+#if defined(_WIN32)
+#include <Windows.h>
+#endif
 
 using namespace web;
 using namespace web::http;
@@ -79,9 +82,9 @@ void Nacos::run()
         {
             for (const std::string &item : m_cfg.addrs)
             {
-                web::uri u = uri_builder("http://" + item + "/nacos/v1/ns/instance/beat")
-                                .append_query<string_t>("serviceName", m_cfg.serviceName)
-                                .append_query<string_t>("beat", beat)
+                web::uri u = uri_builder(conversions::to_string_t("http://") + conversions::to_string_t(item) + conversions::to_string_t("/nacos/v1/ns/instance/beat"))
+                                .append_query<string_t>(conversions::to_string_t("serviceName"), conversions::to_string_t(m_cfg.serviceName))
+                                .append_query<string_t>(conversions::to_string_t("beat"), conversions::to_string_t(beat))
                                 .to_uri();
                 http_client client(u, client_config);
                 try
@@ -91,7 +94,7 @@ void Nacos::run()
                 catch (std::exception const &e)
                 {
                     if (m_logger)
-                        m_logger(40000, "Nacos " + u.to_string() + " heartbeat exception:" + e.what());
+                        m_logger(40000, "Nacos " + conversions::to_utf8string(u.to_string()) + " heartbeat exception:" + e.what());
                 }
             }
         }
@@ -108,7 +111,11 @@ void Nacos::run()
         }
         
         //
+#ifdef _WIN32
+        Sleep(m_cfg.beatTime * 1000);
+#else
         usleep(m_cfg.beatTime * 1000000);
+#endif
     }
 }
 
@@ -171,8 +178,8 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
 
         web::http::client::http_client_config client_config;
         client_config.set_timeout(seconds(3));
-        web::uri u = uri_builder("http://" + item.first + "/nacos/v1/ns/instance/list")
-                        .append_query<string_t>("serviceName", service)
+        web::uri u = uri_builder(conversions::to_string_t("http://") + conversions::to_string_t(item.first) + conversions::to_string_t("/nacos/v1/ns/instance/list"))
+                        .append_query<string_t>(conversions::to_string_t("serviceName"), conversions::to_string_t(service))
                         .to_uri();
         http_client client(u, client_config);
         try
@@ -182,47 +189,47 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
             ST_MS_INSTANCE inst;
             if (!body.is_null())
             {
-                json::value hosts = body["hosts"];
+                json::value hosts = body[conversions::to_string_t("hosts")];
                 if (!hosts.is_null() && hosts.is_array())
                 {
                     for (size_t i = 0; i < hosts.size(); i++)
                     {
                         json::value &host = hosts.at(i);
-                        if (host.has_string_field("ip"))
-                            inst.ip = host["ip"].as_string();
+                        if (host.has_string_field(conversions::to_string_t("ip")))
+                            inst.ip = conversions::to_utf8string(host[conversions::to_string_t("ip")].as_string());
 
-                        if (host.has_integer_field("port"))
-                            inst.port = host["port"].as_integer();
+                        if (host.has_integer_field(conversions::to_string_t("port")))
+                            inst.port = host[conversions::to_string_t("port")].as_integer();
 
-                        if (host.has_boolean_field("healthy"))
-                            inst.healthy = host["healthy"].as_bool();
+                        if (host.has_boolean_field(conversions::to_string_t("healthy")))
+                            inst.healthy = host[conversions::to_string_t("healthy")].as_bool();
 
-                        if (host.has_boolean_field("enabled"))
-                            inst.enabled = host["enabled"].as_bool();
+                        if (host.has_boolean_field(conversions::to_string_t("enabled")))
+                            inst.enabled = host[conversions::to_string_t("enabled")].as_bool();
 
-                        if (host.has_boolean_field("valid"))
-                            inst.valid = host["valid"].as_bool();
+                        if (host.has_boolean_field(conversions::to_string_t("valid")))
+                            inst.valid = host[conversions::to_string_t("valid")].as_bool();
 
-                        if (host.has_boolean_field("marked"))
-                            inst.marked = host["marked"].as_bool();
+                        if (host.has_boolean_field(conversions::to_string_t("marked")))
+                            inst.marked = host[conversions::to_string_t("marked")].as_bool();
 
-                        if (host.has_boolean_field("ephemeral"))
-                            inst.ephemeral = host["ephemeral"].as_bool();
+                        if (host.has_boolean_field(conversions::to_string_t("ephemeral")))
+                            inst.ephemeral = host[conversions::to_string_t("ephemeral")].as_bool();
 
-                        if (host.has_string_field("instanceId"))
-                            inst.instanceId = host["instanceId"].as_string();
+                        if (host.has_string_field(conversions::to_string_t("instanceId")))
+                            inst.instanceId = conversions::to_utf8string(host[conversions::to_string_t("instanceId")].as_string());
 
-                        if (host.has_string_field("clusterName"))
-                            inst.clusterName = host["clusterName"].as_string();
+                        if (host.has_string_field(conversions::to_string_t("clusterName")))
+                            inst.clusterName = conversions::to_utf8string(host[conversions::to_string_t("clusterName")].as_string());
 
-                        if (host.has_string_field("serviceName"))
-                            inst.serviceName = host["serviceName"].as_string();
+                        if (host.has_string_field(conversions::to_string_t("serviceName")))
+                            inst.serviceName = conversions::to_utf8string(host[conversions::to_string_t("serviceName")].as_string());
 
-                        if (host.has_double_field("weight"))
-                            inst.weight = host["weight"].as_double();
+                        if (host.has_double_field(conversions::to_string_t("weight")))
+                            inst.weight = host[conversions::to_string_t("weight")].as_double();
 
-                        if (host.has_field("metadata"))
-                            inst.metadata = host["metadata"];
+                        if (host.has_field(conversions::to_string_t("metadata")))
+                            inst.metadata = host[conversions::to_string_t("metadata")];
 
                         bool ext = false;
                         for (size_t i = 0; i < instances.size(); i++)
@@ -245,7 +252,7 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
         catch (std::exception const &e)
         {
             if (m_logger)
-                m_logger(40000, "Nacos " + u.to_string() + " instance list: " + e.what());
+                m_logger(40000, "Nacos " + conversions::to_utf8string(u.to_string()) + " instance list: " + e.what());
         }
     }
 }
