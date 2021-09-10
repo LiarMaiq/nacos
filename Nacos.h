@@ -14,7 +14,11 @@ struct ST_NACOS_CFG
     std::string callback;           // service addr register to nacos: 10.49.87.100:8200
 };
 
+#ifdef _WIN32
+class __declspec(dllexport) Nacos
+#else
 class Nacos
+#endif
 {
 public:
     Nacos();
