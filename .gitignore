@@ -5,6 +5,8 @@ vs/.vs
 vs/Debug
 vs/Release
 vs/x64
+out
+.vs
 
 # file
 /vs/Nacos.VC.VC.opendb
