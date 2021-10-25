@@ -3,10 +3,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 PROJECT(Nacos)
 
-find_package(cpprestsdk CONFIG REQUIRED)
-
 # Nacos
 add_library(Nacos SHARED Nacos.cpp MicroService.cpp)
+
+find_package(cpprestsdk CONFIG REQUIRED)
 if(WIN32)
 	target_link_libraries(Nacos PRIVATE cpprestsdk::cpprest cpprestsdk::cpprestsdk_zlib_internal cpprestsdk::cpprestsdk_brotli_internal)
 else()
