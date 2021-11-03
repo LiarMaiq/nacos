@@ -89,7 +89,9 @@ void Nacos::run()
                 http_client client(u, client_config);
                 try
                 {
-                    client.request(methods::PUT).then([this, item](http_response res){ m_addrs[item] = true; });
+                    http_response res = client.request(methods::PUT).get();
+                    if (res.status_code() == status_codes::OK)
+                        m_addrs[item] = true;
                 }
                 catch (std::exception const &e)
                 {
@@ -184,8 +186,13 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
         http_client client(u, client_config);
         try
         {
-            json::value body = client.request(methods::GET).then([](http_response res) -> auto
-                                              { return res.extract_json(); }).get();
+            json::value body;
+            http_response res = client.request(methods::GET).get();
+            if (res.status_code() == status_codes::OK)
+                body = res.extract_json().get();
+            else
+                continue;
+
             ST_MS_INSTANCE inst;
             if (!body.is_null())
             {
