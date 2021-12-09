@@ -10,18 +10,19 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "cmakeToolchain": "E:/thirdparty/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "cmakeToolchain": "E:/vcpkg/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "x64-Release",
       "generator": "Ninja",
-      "configurationType": "RelWithDebInfo",
+      "configurationType": "Release",
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "inheritEnvironments": [ "msvc_x64_x64" ]
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "cmakeToolchain": "E:/vcpkg/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "WSL-GCC-Debug",
@@ -35,12 +36,12 @@
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "linux_x64" ],
       "wslPath": "C:\\Users\\LiarMaiq\\AppData\\Local\\Microsoft\\WindowsApps\\ubuntu.exe",
-      "cmakeToolchain": "/mnt/e/thirdparty/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "cmakeToolchain": "/mnt/e/vcpkg/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "WSL-GCC-Release",
       "generator": "Ninja",
-      "configurationType": "RelWithDebInfo",
+      "configurationType": "Release",
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeExecutable": "cmake",
@@ -49,7 +50,7 @@
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "linux_x64" ],
       "wslPath": "C:\\Users\\LiarMaiq\\AppData\\Local\\Microsoft\\WindowsApps\\ubuntu.exe",
-      "cmakeToolchain": "/mnt/e/thirdparty/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "cmakeToolchain": "/mnt/e/vcpkg/scripts/buildsystems/vcpkg.cmake"
     }
   ]
 }
