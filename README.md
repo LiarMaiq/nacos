@@ -5,7 +5,7 @@ A simple and very easy to use Alibaba Nacos C++ client.
 
 #### 安装教程
 
-1.  sudo apt install libcpprest2.10
+1.  sudo apt install libcurl
 2.  mkdir build
 3.  cd build
 4.  cmake ..
