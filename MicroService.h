@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "cpprest/json.h"
+#include "nlohmann/json.hpp"
 
 struct ST_MS_INSTANCE
 {
@@ -12,7 +12,7 @@ struct ST_MS_INSTANCE
 	bool valid;
 	bool ephemeral;
 	bool marked;
-    web::json::value metadata;
+    nlohmann::json metadata;
 	std::string instanceId;
 	std::string serviceName;
 	std::string clusterName;

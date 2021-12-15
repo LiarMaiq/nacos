@@ -1,15 +1,14 @@
 # Nacos
 # Use vcpkg and Visual Studio 2019
 CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
-PROJECT(Nacos)
+PROJECT(nacos)
 
 # Nacos
-add_library(Nacos SHARED Nacos.cpp MicroService.cpp)
+add_library(nacos SHARED Nacos.cpp MicroService.cpp)
 
-find_package(cpprestsdk CONFIG REQUIRED)
-if(WIN32)
-	target_link_libraries(Nacos PRIVATE cpprestsdk::cpprest cpprestsdk::cpprestsdk_zlib_internal cpprestsdk::cpprestsdk_brotli_internal)
-else()
-	target_link_libraries(Nacos PRIVATE cpprestsdk::cpprest cpprestsdk::cpprestsdk_zlib_internal cpprestsdk::cpprestsdk_boost_internal cpprestsdk::cpprestsdk_openssl_internal)
-endif()
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(nacos PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
+
+find_package(CURL CONFIG REQUIRED)
+target_link_libraries(nacos PRIVATE CURL::libcurl)
 

@@ -5,13 +5,25 @@
 #include <string>
 #include "MicroService.h"
 
+struct ST_NACOS_BEAT
+{
+    bool enable;                    // beat or not
+    int beatTime;                   // second
+    std::string path;               // uri
+    std::map<std::string, std::string> queries;
+};
+
+struct ST_NACOS_LIST
+{
+    std::string path;               // uri
+    std::map<std::string, std::string> queries;
+};
+
 struct ST_NACOS_CFG
 {
     std::vector<std::string> addrs; // 10.29.195.12:8847
-    bool beat;                      // beat or not
-    int beatTime;                   // second
-    std::string serviceName;        // service name register to nacos
-    std::string callback;           // service addr register to nacos: 10.49.87.100:8200
+    ST_NACOS_BEAT beat;
+    ST_NACOS_LIST list;
 };
 
 #ifdef _WIN32
@@ -25,7 +37,7 @@ public:
     ~Nacos();
 
 public:
-    int init(const ST_NACOS_CFG cfg);
+    int init();
     // size_t pushService(const std::string& service, std::list<nacos::Instance>& instances);
     std::string require(const std::string service);
     void setLogger(std::function<void(int level, std::string log)> logger);
@@ -37,6 +49,8 @@ protected:
     void getInstances(const std::string service, std::vector<ST_MS_INSTANCE>& instances);
 
 private:
+    void* m_curlBeat;
+    void* m_curlList;
     std::future<void> m_future;
     std::map<std::string, MicroService> m_microServices;
     bool m_stopping;

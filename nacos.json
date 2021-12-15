@@ -1,0 +1,32 @@
+{
+  "addrs": [ "10.29.195.12:8847", "10.29.195.12:8848" ],
+  "beat": {
+    "enable": true,
+    "beatTime": 10,
+    "path": "/nacos/v1/ns/instance/beat",
+    "queries": {
+      "serviceName": "doge-100",
+      "groupName": "",
+      "ephemeral": false,
+      "beat": {
+        "cluster": "",
+        "ip": "10.49.87.100",
+        "metadata": {},
+        "port": 5561,
+        "scheduled": true,
+        "serviceName": "doge-100",
+        "weight": 1
+      }
+    }
+  },
+  "list": {
+    "path": "/nacos/v1/ns/instance/list",
+    "queries": {
+      "serviceName": "doge-100",
+      "groupName": "",
+      "namespaceId": "",
+      "clusters": "",
+      "healthyOnly": true
+    }
+  }
+}

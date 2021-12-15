@@ -1,33 +1,86 @@
 #include "Nacos.h"
-#include "cpprest/http_client.h"
-#include "cpprest/http_msg.h"
 #include "MicroService.h"
 #if defined(_WIN32)
 #include <Windows.h>
+#else
+#include <unistd.h>
 #endif
-
-using namespace web;
-using namespace web::http;
-using namespace web::http::client;
-using namespace utility;
+#include "nlohmann/json.hpp"
+#include "curl/curl.h"
+#include <fstream>
 
 Nacos::Nacos()
 {
     m_stopping = false;
+    m_curlBeat = 0;
+    m_curlList = 0;
 }
 
 Nacos::~Nacos()
 {
     m_stopping = true;
     m_future.wait();
+    if (m_curlBeat)
+        curl_easy_cleanup(m_curlBeat);
+    if (m_curlList)
+        curl_easy_cleanup(m_curlList);
 }
 
-int Nacos::init(const ST_NACOS_CFG cfg)
+int Nacos::init()
 {
-    m_cfg = cfg;
-    // No beat, addr is available by default
-    for (std::string addr : cfg.addrs)
-        m_addrs[addr] = (!cfg.beat);
+    curl_global_init(CURL_GLOBAL_ALL);
+    m_curlBeat = curl_easy_init();
+    m_curlList = curl_easy_init();
+    if (!m_curlBeat || !m_curlList)
+    {
+        if (m_logger)
+            m_logger(40000, "Curl init failed");
+        return -1;
+    }
+
+    nlohmann::json jCfg;
+    std::fstream in("nacos.json");
+    try
+    {
+        in >> jCfg;
+    }
+    catch (const std::exception& e)
+    {
+        if (m_logger)
+            m_logger(40000, std::string("Parse file nacos.json exception:") + e.what());
+        return -1;
+    }
+    if (jCfg.is_null())
+    {
+        if (m_logger)
+            m_logger(40000, "Parse file nacos.json failed");
+        return -1;
+    }
+
+    for (auto& addr : jCfg["addrs"])
+        m_cfg.addrs.push_back(addr.get<std::string>());
+
+    m_cfg.beat.enable = jCfg["beat"]["enable"];
+    if (m_cfg.beat.enable)
+    {
+        m_cfg.beat.path = jCfg["beat"]["path"];
+        m_cfg.beat.beatTime = jCfg["beat"]["beatTime"];
+        m_cfg.beat.queries["serviceName"] = jCfg["beat"]["queries"]["serviceName"].get<std::string>();
+        m_cfg.beat.queries["groupName"] = jCfg["beat"]["queries"]["groupName"].get<std::string>();
+        m_cfg.beat.queries["ephemeral"] = jCfg["beat"]["queries"]["ephemeral"].get<bool>() ? "true" : "false";
+        std::string beat = jCfg["beat"]["queries"]["beat"].dump();
+        char* output = curl_escape(beat.c_str(), beat.length());
+        m_cfg.beat.queries["beat"] = std::string(output);
+        curl_free(output);
+    }
+
+    m_cfg.list.path = jCfg["list"]["path"];
+    m_cfg.list.queries["serviceName"] = jCfg["list"]["queries"]["serviceName"].get<std::string>();
+    m_cfg.list.queries["groupName"] = jCfg["list"]["queries"]["groupName"].get<std::string>();
+    m_cfg.list.queries["namespaceId"] = jCfg["list"]["queries"]["namespaceId"].get<std::string>();
+    m_cfg.list.queries["clusters"] = jCfg["list"]["queries"]["clusters"].get<std::string>();
+    m_cfg.list.queries["healthyOnly"] = jCfg["list"]["queries"]["healthyOnly"].get<bool>() ? "true" : "false";
+
     m_future = std::async(std::launch::async, [this]()->void{this->run();});
     return 0;// In release no return will get "double free or corruption (fasttop)" error
 }
@@ -52,52 +105,60 @@ void Nacos::listServices()
     }
 }
 
+static size_t easy_read_cb(void* ptr, size_t size, size_t nmemb, void* userp)
+{
+    //struct input* i = userp;
+    //size_t retcode = fread(ptr, size, nmemb, i->in);
+    //i->bytes_read += retcode;
+    //return retcode;
+    return 0;
+}
+
+size_t easy_write_cb(void* data, size_t size, size_t count, void* userp) {
+    const size_t n = size * count;
+    if (userp)
+    {
+        std::string* body = (std::string*)userp;
+        body->append((char*)data, n);
+    }
+    return n;
+}
+
 void Nacos::run()
 {
-    // Nacos
-    //for (const std::string& item : nacoss)
-    //{
-    //    web::uri u = uri_builder(conversions::to_string_t("http://" + item + "/nacos/v1/ns/instance"))
-    //        .append_query<string_t>(L"port", L"5561")
-    //        .append_query<string_t>(L"healthy", L"true")
-    //        .append_query<string_t>(L"ip", L"10.49.87.100")
-    //        .append_query<string_t>(L"weight", L"1.0")
-    //        .append_query<string_t>(L"serviceName", L"doge")
-    //        .append_query<string_t>(L"encoding", L"GBK")
-    //        .to_uri();
-    //    http_client client(u);
-    //    http_response rsp = client.request(methods::POST).wait();
-    //}
+    curl_easy_setopt(m_curlBeat, CURLOPT_UPLOAD, 1);
+    curl_easy_setopt(m_curlBeat, CURLOPT_READFUNCTION, easy_read_cb);
+    curl_easy_setopt(m_curlBeat, CURLOPT_READDATA, 0);
+    curl_easy_setopt(m_curlBeat, CURLOPT_WRITEFUNCTION, easy_write_cb);
+    curl_easy_setopt(m_curlBeat, CURLOPT_WRITEDATA, 0);
 
-    std::string callback = m_cfg.callback;
-    std::string ip = callback.substr(0U, callback.find(':'));
-    std::string httpPort = callback.substr(callback.find(':') + 1);
-    std::string beat = "{ \"cluster\":\"\",\"ip\":\"" + ip + "\",\"metadata\":{},\"port\":" + httpPort + ",\"scheduled\":true,\"serviceName\":\"" + m_cfg.serviceName + "\",\"weight\":1}";
-    web::http::client::http_client_config client_config;
-    client_config.set_timeout(seconds(5));
+    //curl_easy_setopt(e, CURLOPT_HEADERFUNCTION, easy_header_cb);
+    //curl_easy_setopt(e, CURLOPT_HEADERDATA, (void*)ctx);
+    curl_easy_setopt(m_curlList, CURLOPT_WRITEFUNCTION, easy_write_cb);
+
     while (!m_stopping)
     {
         // beat
-        if (!m_cfg.serviceName.empty() && !m_cfg.callback.empty() && m_cfg.beat)
+        if (!m_cfg.beat.queries["serviceName"].empty() && m_cfg.beat.enable)
         {
             for (const std::string &item : m_cfg.addrs)
             {
-                web::uri u = uri_builder(conversions::to_string_t("http://") + conversions::to_string_t(item) + conversions::to_string_t("/nacos/v1/ns/instance/beat"))
-                                .append_query<string_t>(conversions::to_string_t("serviceName"), conversions::to_string_t(m_cfg.serviceName))
-                                .append_query<string_t>(conversions::to_string_t("beat"), conversions::to_string_t(beat))
-                                .to_uri();
-                http_client client(u, client_config);
-                try
-                {
-                    http_response res = client.request(methods::PUT).get();
-                    if (res.status_code() == status_codes::OK)
-                        m_addrs[item] = true;
-                }
-                catch (std::exception const &e)
-                {
-                    if (m_logger)
-                        m_logger(40000, "Nacos " + conversions::to_utf8string(u.to_string()) + " heartbeat exception:" + e.what());
-                }
+                std::string u = "http://" + item + m_cfg.beat.path;
+                u += "?serviceName=" + m_cfg.beat.queries["serviceName"];
+                u += "&beat=" + m_cfg.beat.queries["beat"];
+                u += "&ephemeral=" + m_cfg.beat.queries["ephemeral"];
+                if (!m_cfg.beat.queries["groupName"].empty())
+                    u += "&groupName=" + m_cfg.beat.queries["groupName"];
+
+                curl_easy_setopt(m_curlBeat, CURLOPT_URL, u.c_str());
+
+                CURLcode res;
+                int statusCodes = 0;
+                res = curl_easy_perform(m_curlBeat);
+                if (res == CURLcode::CURLE_OK)
+                    curl_easy_getinfo(m_curlBeat, CURLINFO_RESPONSE_CODE, &statusCodes);
+                if (statusCodes == 200)
+                    m_addrs[item] = true;
             }
         }
 
@@ -114,9 +175,9 @@ void Nacos::run()
         
         //
 #ifdef _WIN32
-        Sleep(m_cfg.beatTime * 1000);
+        Sleep(m_cfg.beat.beatTime * 1000);
 #else
-        usleep(m_cfg.beatTime * 1000000);
+        usleep(m_cfg.beat.beatTime * 1000000);
 #endif
     }
 }
@@ -178,88 +239,95 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
         if(!item.second)
             continue;
 
-        web::http::client::http_client_config client_config;
-        client_config.set_timeout(seconds(3));
-        web::uri u = uri_builder(conversions::to_string_t("http://") + conversions::to_string_t(item.first) + conversions::to_string_t("/nacos/v1/ns/instance/list"))
-                        .append_query<string_t>(conversions::to_string_t("serviceName"), conversions::to_string_t(service))
-                        .to_uri();
-        http_client client(u, client_config);
-        try
+        std::string u = "http://" + item.first + m_cfg.list.path;
+        u += "?serviceName=" + m_cfg.list.queries["serviceName"];
+        u += "&healthyOnly=" + m_cfg.list.queries["healthyOnly"];
+        if (!m_cfg.list.queries["groupName"].empty())
+            u += "&groupName=" + m_cfg.list.queries["groupName"];
+        if (!m_cfg.list.queries["namespaceId"].empty())
+            u += "&namespaceId=" + m_cfg.list.queries["namespaceId"];
+        if (!m_cfg.list.queries["clusters"].empty())
+            u += "&clusters=" + m_cfg.list.queries["clusters"];
+
+        curl_easy_setopt(m_curlList, CURLOPT_URL, u.c_str());
+        std::string body;
+        curl_easy_setopt(m_curlList, CURLOPT_WRITEDATA, (void*)&body);
+
+        CURLcode res;
+        int statusCodes = 0;
+        res = curl_easy_perform(m_curlList);
+        if (res != CURLcode::CURLE_OK)
+            continue;
+
+        curl_easy_getinfo(m_curlList, CURLINFO_RESPONSE_CODE, &statusCodes);
+        if (statusCodes != 200)
+            continue;
+
+        ST_MS_INSTANCE inst;
+        if (body.empty())
+            continue;
+
+        nlohmann::json jBody = nlohmann::json::parse(body, nullptr, false, true);
+        if (jBody.is_null())
+            continue;
+
+        nlohmann::json hosts = jBody["hosts"];
+        if (!hosts.is_null() && hosts.is_array())
         {
-            json::value body;
-            http_response res = client.request(methods::GET).get();
-            if (res.status_code() == status_codes::OK)
-                body = res.extract_json().get();
-            else
-                continue;
-
-            ST_MS_INSTANCE inst;
-            if (!body.is_null())
+            for (size_t i = 0; i < hosts.size(); i++)
             {
-                json::value hosts = body[conversions::to_string_t("hosts")];
-                if (!hosts.is_null() && hosts.is_array())
+                nlohmann::json& host = hosts.at(i);
+                if (host.find("ip") != host.end())
+                    inst.ip = host["ip"].get<std::string>();
+
+                if (host.find("port") != host.end())
+                    inst.port = host["port"].get<int>();
+
+                if (host.find("healthy") != host.end())
+                    inst.healthy = host["healthy"].get<bool>();
+
+                if (host.find("enabled") != host.end())
+                    inst.enabled = host["enabled"].get<bool>();
+
+                if (host.find("valid") != host.end())
+                    inst.valid = host["valid"].get<bool>();
+
+                if (host.find("marked") != host.end())
+                    inst.marked = host["marked"].get<bool>();
+
+                if (host.find("ephemeral") != host.end())
+                    inst.ephemeral = host["ephemeral"].get<bool>();
+
+                if (host.find("instanceId") != host.end())
+                    inst.instanceId = host["instanceId"].get<std::string>();
+
+                if (host.find("clusterName") != host.end())
+                    inst.clusterName = host["clusterName"].get<std::string>();
+
+                if (host.find("serviceName") != host.end())
+                    inst.serviceName = host["serviceName"].get<std::string>();
+
+                if (host.find("weight") != host.end())
+                    inst.weight = host["weight"].get<double>();
+
+                if (host.find("metadata") != host.end())
+                    inst.metadata = host["metadata"].get<nlohmann::json>();
+
+                bool ext = false;
+                for (size_t i = 0; i < instances.size(); i++)
                 {
-                    for (size_t i = 0; i < hosts.size(); i++)
+                    if (instances[i] == inst)
                     {
-                        json::value &host = hosts.at(i);
-                        if (host.has_string_field(conversions::to_string_t("ip")))
-                            inst.ip = conversions::to_utf8string(host[conversions::to_string_t("ip")].as_string());
-
-                        if (host.has_integer_field(conversions::to_string_t("port")))
-                            inst.port = host[conversions::to_string_t("port")].as_integer();
-
-                        if (host.has_boolean_field(conversions::to_string_t("healthy")))
-                            inst.healthy = host[conversions::to_string_t("healthy")].as_bool();
-
-                        if (host.has_boolean_field(conversions::to_string_t("enabled")))
-                            inst.enabled = host[conversions::to_string_t("enabled")].as_bool();
-
-                        if (host.has_boolean_field(conversions::to_string_t("valid")))
-                            inst.valid = host[conversions::to_string_t("valid")].as_bool();
-
-                        if (host.has_boolean_field(conversions::to_string_t("marked")))
-                            inst.marked = host[conversions::to_string_t("marked")].as_bool();
-
-                        if (host.has_boolean_field(conversions::to_string_t("ephemeral")))
-                            inst.ephemeral = host[conversions::to_string_t("ephemeral")].as_bool();
-
-                        if (host.has_string_field(conversions::to_string_t("instanceId")))
-                            inst.instanceId = conversions::to_utf8string(host[conversions::to_string_t("instanceId")].as_string());
-
-                        if (host.has_string_field(conversions::to_string_t("clusterName")))
-                            inst.clusterName = conversions::to_utf8string(host[conversions::to_string_t("clusterName")].as_string());
-
-                        if (host.has_string_field(conversions::to_string_t("serviceName")))
-                            inst.serviceName = conversions::to_utf8string(host[conversions::to_string_t("serviceName")].as_string());
-
-                        if (host.has_double_field(conversions::to_string_t("weight")))
-                            inst.weight = host[conversions::to_string_t("weight")].as_double();
-
-                        if (host.has_field(conversions::to_string_t("metadata")))
-                            inst.metadata = host[conversions::to_string_t("metadata")];
-
-                        bool ext = false;
-                        for (size_t i = 0; i < instances.size(); i++)
-                        {
-                            if (instances[i] == inst)
-                            {
-                                ext = true;
-                                // update instance healthy = true
-                                if (inst.healthy)
-                                    instances[i].healthy = inst.healthy;
-                                break;
-                            }
-                        }
-                        if (!ext)
-                            instances.push_back(inst);
+                        ext = true;
+                        // update instance healthy = true
+                        if (inst.healthy)
+                            instances[i].healthy = inst.healthy;
+                        break;
                     }
                 }
+                if (!ext)
+                    instances.push_back(inst);
             }
-        }
-        catch (std::exception const &e)
-        {
-            if (m_logger)
-                m_logger(40000, "Nacos " + conversions::to_utf8string(u.to_string()) + " instance list: " + e.what());
         }
     }
 }
