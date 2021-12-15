@@ -75,7 +75,6 @@ int Nacos::init()
     }
 
     m_cfg.list.path = jCfg["list"]["path"];
-    m_cfg.list.queries["serviceName"] = jCfg["list"]["queries"]["serviceName"].get<std::string>();
     m_cfg.list.queries["groupName"] = jCfg["list"]["queries"]["groupName"].get<std::string>();
     m_cfg.list.queries["namespaceId"] = jCfg["list"]["queries"]["namespaceId"].get<std::string>();
     m_cfg.list.queries["clusters"] = jCfg["list"]["queries"]["clusters"].get<std::string>();
@@ -240,7 +239,7 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
             continue;
 
         std::string u = "http://" + item.first + m_cfg.list.path;
-        u += "?serviceName=" + m_cfg.list.queries["serviceName"];
+        u += "?serviceName=" + service;
         u += "&healthyOnly=" + m_cfg.list.queries["healthyOnly"];
         if (!m_cfg.list.queries["groupName"].empty())
             u += "&groupName=" + m_cfg.list.queries["groupName"];

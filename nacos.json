@@ -22,7 +22,6 @@
   "list": {
     "path": "/nacos/v1/ns/instance/list",
     "queries": {
-      "serviceName": "doge-100",
       "groupName": "",
       "namespaceId": "",
       "clusters": "",
