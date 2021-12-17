@@ -8,7 +8,6 @@
 struct ST_NACOS_BEAT
 {
     bool enable;                    // beat or not
-    int beatTime;                   // second
     std::string path;               // uri
     std::map<std::string, std::string> queries;
 };
@@ -22,6 +21,7 @@ struct ST_NACOS_LIST
 struct ST_NACOS_CFG
 {
     std::vector<std::string> addrs; // 10.29.195.12:8847
+    int interval;                   // second
     ST_NACOS_BEAT beat;
     ST_NACOS_LIST list;
 };

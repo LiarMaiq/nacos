@@ -60,11 +60,13 @@ int Nacos::init()
     for (auto& addr : jCfg["addrs"])
         m_cfg.addrs.push_back(addr.get<std::string>());
 
+    m_cfg.interval = jCfg["interval"];
+    m_cfg.interval = m_cfg.interval < 1 ? 10 : m_cfg.interval;
+
     m_cfg.beat.enable = jCfg["beat"]["enable"];
     if (m_cfg.beat.enable)
     {
         m_cfg.beat.path = jCfg["beat"]["path"];
-        m_cfg.beat.beatTime = jCfg["beat"]["beatTime"];
         m_cfg.beat.queries["serviceName"] = jCfg["beat"]["queries"]["serviceName"].get<std::string>();
         m_cfg.beat.queries["groupName"] = jCfg["beat"]["queries"]["groupName"].get<std::string>();
         m_cfg.beat.queries["ephemeral"] = jCfg["beat"]["queries"]["ephemeral"].get<bool>() ? "true" : "false";
@@ -174,9 +176,9 @@ void Nacos::run()
         
         //
 #ifdef _WIN32
-        Sleep(m_cfg.beat.beatTime * 1000);
+        Sleep(m_cfg.interval * 1000);
 #else
-        usleep(m_cfg.beat.beatTime * 1000000);
+        usleep(m_cfg.interval * 1000000);
 #endif
     }
 }

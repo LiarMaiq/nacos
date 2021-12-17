@@ -1,8 +1,8 @@
 {
   "addrs": [ "10.29.195.12:8847", "10.29.195.12:8848" ],
+  "interval": 10,
   "beat": {
     "enable": true,
-    "beatTime": 10,
     "path": "/nacos/v1/ns/instance/beat",
     "queries": {
       "serviceName": "doge-100",
