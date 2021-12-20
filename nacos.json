@@ -24,8 +24,7 @@
     "queries": {
       "groupName": "",
       "namespaceId": "",
-      "clusters": "",
-      "healthyOnly": true
+      "clusters": ""
     }
   }
 }

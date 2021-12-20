@@ -3,7 +3,8 @@
 #include <map>
 #include <future>
 #include <string>
-#include "MicroService.h"
+
+class Service;
 
 struct ST_NACOS_BEAT
 {
@@ -26,6 +27,41 @@ struct ST_NACOS_CFG
     ST_NACOS_LIST list;
 };
 
+struct ST_INSTANCE
+{
+    std::string ip;
+    int port;
+    bool enabled;
+    bool healthy;
+    bool valid;
+    bool ephemeral;
+    bool marked;
+    std::string metadata;   // json
+    std::string instanceId;
+    std::string serviceName;
+    std::string clusterName;
+    double weight;
+
+    bool operator==(const ST_INSTANCE& inst) const
+    {
+        return (inst.ip == this->ip) && (inst.port == this->port);
+    }
+    bool operator!=(const ST_INSTANCE& inst) const
+    {
+        return !(this->operator==(inst));
+    }
+
+    std::string handle()
+    {
+        return ip + ":" + std::to_string(port);
+    }
+
+    bool available()
+    {
+        return healthy & enabled & valid & (port > 0) & (!ip.empty());
+    }
+};
+
 #ifdef _WIN32
 class __declspec(dllexport) Nacos
 #else
@@ -46,13 +82,13 @@ public:
 
 protected:
     void run();
-    void getInstances(const std::string service, std::vector<ST_MS_INSTANCE>& instances);
+    void getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances);
 
 private:
     void* m_curlBeat;
     void* m_curlList;
     std::future<void> m_future;
-    std::map<std::string, MicroService> m_microServices;
+    std::map<std::string, Service*> m_services;
     bool m_stopping;
     std::function<void(int level, std::string log)> m_logger;
     ST_NACOS_CFG m_cfg;

@@ -1,5 +1,5 @@
 #include "Nacos.h"
-#include "MicroService.h"
+#include "Service.h"
 #if defined(_WIN32)
 #include <Windows.h>
 #else
@@ -24,6 +24,11 @@ Nacos::~Nacos()
         curl_easy_cleanup(m_curlBeat);
     if (m_curlList)
         curl_easy_cleanup(m_curlList);
+
+    for (auto item : m_services)
+    {
+        delete item.second;
+    }
 }
 
 int Nacos::init()
@@ -80,7 +85,6 @@ int Nacos::init()
     m_cfg.list.queries["groupName"] = jCfg["list"]["queries"]["groupName"].get<std::string>();
     m_cfg.list.queries["namespaceId"] = jCfg["list"]["queries"]["namespaceId"].get<std::string>();
     m_cfg.list.queries["clusters"] = jCfg["list"]["queries"]["clusters"].get<std::string>();
-    m_cfg.list.queries["healthyOnly"] = jCfg["list"]["queries"]["healthyOnly"].get<bool>() ? "true" : "false";
 
     m_future = std::async(std::launch::async, [this]()->void{this->run();});
     return 0;// In release no return will get "double free or corruption (fasttop)" error
@@ -93,11 +97,11 @@ void Nacos::setLogger(std::function<void(int level, std::string log)> logger)
 
 void Nacos::listServices()
 {
-    for (auto& ms : m_microServices)
+    for (auto& ms : m_services)
     {
         if (m_logger)
                 m_logger(40000, ms.first + ":");
-        std::vector<std::pair<std::string, bool> > mss = ms.second.gets();
+        std::vector<std::pair<std::string, bool> > mss = ms.second->gets();
         for (size_t i = 0; i < mss.size(); i++)
         {
             if (m_logger)
@@ -164,14 +168,11 @@ void Nacos::run()
         }
 
         // 
-        for (auto& ms : m_microServices)
+        for (auto& ms : m_services)
         {
-            std::vector<ST_MS_INSTANCE> instances;
+            std::map<std::string, ST_INSTANCE> instances;
             getInstances(ms.first, instances);
-            for (size_t i = 0; i < instances.size(); i++)
-            {
-                ms.second.set(instances[i]);
-            }
+            ms.second->set(instances);
         }
         
         //
@@ -188,19 +189,16 @@ std::string Nacos::require(const std::string service)
     if (service.empty())
         return "";
     
-    auto iter = m_microServices.find(service);
-    if (iter == m_microServices.end())
+    auto iter = m_services.find(service);
+    if (iter == m_services.end())
     {
-        std::vector<ST_MS_INSTANCE> instances;
+        std::map<std::string, ST_INSTANCE> instances;
         getInstances(service, instances);
-        m_microServices[service] = MicroService();
-        m_microServices[service].setName(service);
-        for (size_t i = 0; i < instances.size(); i++)
-        {
-            m_microServices[service].set(instances[i]);
-        }
+        m_services[service] = new Service();
+        m_services[service]->setName(service);
+        m_services[service]->set(instances);
     }
-    return m_microServices[service].get();
+    return m_services[service]->get();
 }
 
 /*
@@ -232,7 +230,7 @@ std::string Nacos::require(const std::string service)
     "useSpecifiedURL":false
 }
 */
-void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>& instances)
+void Nacos::getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances)
 {
     for (const auto &item : m_addrs)
     {
@@ -242,7 +240,7 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
 
         std::string u = "http://" + item.first + m_cfg.list.path;
         u += "?serviceName=" + service;
-        u += "&healthyOnly=" + m_cfg.list.queries["healthyOnly"];
+        u += "&healthyOnly=true";
         if (!m_cfg.list.queries["groupName"].empty())
             u += "&groupName=" + m_cfg.list.queries["groupName"];
         if (!m_cfg.list.queries["namespaceId"].empty())
@@ -264,7 +262,7 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
         if (statusCodes != 200)
             continue;
 
-        ST_MS_INSTANCE inst;
+        ST_INSTANCE inst;
         if (body.empty())
             continue;
 
@@ -312,22 +310,17 @@ void Nacos::getInstances(const std::string service, std::vector<ST_MS_INSTANCE>&
                     inst.weight = host["weight"].get<double>();
 
                 if (host.find("metadata") != host.end())
-                    inst.metadata = host["metadata"].get<nlohmann::json>();
+                    inst.metadata = host["metadata"].get<nlohmann::json>().dump();
 
-                bool ext = false;
-                for (size_t i = 0; i < instances.size(); i++)
+                auto iter = instances.find(inst.handle());
+                if (iter != instances.end())
                 {
-                    if (instances[i] == inst)
-                    {
-                        ext = true;
-                        // update instance healthy = true
-                        if (inst.healthy)
-                            instances[i].healthy = inst.healthy;
-                        break;
-                    }
+                    // update instance healthy = true
+                    if (inst.healthy)
+                        iter->second.healthy = inst.healthy;
                 }
-                if (!ext)
-                    instances.push_back(inst);
+                else
+                    instances[inst.handle()] = inst;
             }
         }
     }
