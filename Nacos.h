@@ -56,6 +56,11 @@ struct ST_INSTANCE
         return ip + ":" + std::to_string(port);
     }
 
+    int weight_int()
+    {
+        return (int)(weight * 100);
+    }
+
     bool available()
     {
         return healthy & enabled & valid & (port > 0) & (!ip.empty());

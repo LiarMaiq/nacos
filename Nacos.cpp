@@ -156,6 +156,8 @@ void Nacos::run()
                     u += "&groupName=" + m_cfg.beat.queries["groupName"];
 
                 curl_easy_setopt(m_curlBeat, CURLOPT_URL, u.c_str());
+                std::string body;
+                curl_easy_setopt(m_curlList, CURLOPT_WRITEDATA, (void*)&body);
 
                 CURLcode res;
                 int statusCodes = 0;
@@ -164,6 +166,9 @@ void Nacos::run()
                     curl_easy_getinfo(m_curlBeat, CURLINFO_RESPONSE_CODE, &statusCodes);
                 if (statusCodes == 200)
                     m_addrs[item] = true;
+
+                if (m_logger && statusCodes != 200)
+                    m_logger(30000, "Nacos code:" + std::to_string(statusCodes) + " msg:" + body);
             }
         }
 

@@ -1,6 +1,7 @@
 #pragma once
-#include <string>
+#include <unordered_map>
 #include <vector>
+#include <atomic>
 #include "nlohmann/json.hpp"
 #include "concurrentqueue/concurrentqueue.h"
 #include "Nacos.h"
@@ -23,10 +24,11 @@ public:
 private:
     std::string m_name;
     // instance handle -> instance
-    std::map<std::string, ST_INSTANCE> m_instances;
-    // queue<instance handle, status>
-    ConcurrentQueue<std::pair<std::string, bool> >* m_instQueue;
-    // instance handle -> current status
-    std::map<std::string, bool> m_currentStatus;
+    std::unordered_map<std::string, ST_INSTANCE> m_instances;
+    // queue<instance handle>
+    ConcurrentQueue<std::string>* m_instQueue;
+    ProducerToken* m_queueToken;
+    // instance handle -> instance count in queue
+    std::unordered_map<std::string, std::atomic_int> m_instCount;
 };
 

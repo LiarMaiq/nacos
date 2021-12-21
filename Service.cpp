@@ -2,11 +2,14 @@
 
 Service::Service()
 {
-    m_instQueue = new ConcurrentQueue<std::pair<std::string, bool> >(1024);
+    m_instQueue = new ConcurrentQueue<std::string>(1024);
+    // One ProducerToken to ensure the order of item in the queue
+    m_queueToken = new ProducerToken(*m_instQueue);
 }
 
 Service::~Service()
 {
+    delete m_queueToken;
     delete m_instQueue;
 }
 
@@ -23,7 +26,7 @@ void Service::setName(const std::string name)
 std::vector<std::pair<std::string, bool> > Service::gets()
 {
     std::vector<std::pair<std::string, bool> > mss;
-    std::map<std::string, ST_INSTANCE> insts = m_instances;
+    std::unordered_map<std::string, ST_INSTANCE> insts = m_instances;
     for (auto& item : insts)
     {
         std::string addr = "http://" + item.second.handle();
@@ -35,18 +38,19 @@ std::vector<std::pair<std::string, bool> > Service::gets()
 std::string Service::get()
 {
     std::string uri;
-    std::pair<std::string, bool> inst;
+    std::string inst;
     while (m_instQueue->try_dequeue(inst))
     {
-        // 实例未失效，返回uri并重新入队
-        if (inst.second == m_currentStatus[inst.first])
+        if (m_instances[inst].available())
         {
-            // 实例可用才返回uri，否则返回空串
-            if (m_instances[inst.first].available())
-                uri = "http://" + inst.first;
-            m_instQueue->enqueue(inst);
-            break;
+            uri = "http://" + inst;
+            if (m_instances[inst].weight_int() >= m_instCount[inst])
+            {
+                bool result = m_instQueue->enqueue(*m_queueToken, inst);
+                break;
+            }
         }
+        m_instCount[inst]--;
     }
     return uri;
 }
@@ -69,17 +73,16 @@ void Service::set(std::map<std::string, ST_INSTANCE>& instances)
 
     for (auto& item : instances)
     {
-        ST_INSTANCE old = m_instances[item.first];
         m_instances[item.first] = item.second;
 
-        int oldWeight = (int)(old.weight * 100);
-        int weight = (int)(item.second.weight * 100);
-        if (oldWeight != weight)
+        // 计算新实例权重与队列中实例个数差值
+        // 根据差值，补充队列中缺少的实例
+        // 若新实例权重变小，则在调用Service::get时，出队实例不再入队
+        int weight = item.second.weight_int() - m_instCount[item.first];
+        for (int i = 0; i < weight; i++)
         {
-            // 变更实例状态，使队列中的实例失效，并且重新入队新的实例
-            m_currentStatus[item.first] = !m_currentStatus[item.first];
-            for (size_t i = 0; i < weight; i++)
-                m_instQueue->enqueue({ item.first, m_currentStatus[item.first] });
+            bool result = m_instQueue->enqueue(*m_queueToken, item.first);
+            m_instCount[item.first]++;
         }
     }
 }
