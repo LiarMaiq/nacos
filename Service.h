@@ -2,11 +2,10 @@
 #include <unordered_map>
 #include <vector>
 #include <atomic>
+#include <mutex>
+#include <queue>
 #include "nlohmann/json.hpp"
-#include "concurrentqueue/concurrentqueue.h"
-#include "Nacos.h"
-
-using namespace moodycamel;
+#include "NacosImpl.h"
 
 class Service
 {
@@ -25,10 +24,10 @@ private:
     std::string m_name;
     // instance handle -> instance
     std::unordered_map<std::string, ST_INSTANCE> m_instances;
-    // queue<instance handle>
-    ConcurrentQueue<std::string>* m_instQueue;
-    ProducerToken* m_queueToken;
     // instance handle -> instance count in queue
     std::unordered_map<std::string, std::atomic_int> m_instCount;
+    //
+    std::mutex m_mtx;
+    std::queue<std::string> m_instQueue;
 };
 

@@ -2,15 +2,10 @@
 
 Service::Service()
 {
-    m_instQueue = new ConcurrentQueue<std::string>(1024);
-    // One ProducerToken to ensure the order of item in the queue
-    m_queueToken = new ProducerToken(*m_instQueue);
 }
 
 Service::~Service()
 {
-    delete m_queueToken;
-    delete m_instQueue;
 }
 
 const std::string Service::name()
@@ -37,16 +32,22 @@ std::vector<std::pair<std::string, bool> > Service::gets()
 
 std::string Service::get()
 {
+    std::unique_lock<std::mutex> lck(m_mtx);
     std::string uri;
     std::string inst;
-    while (m_instQueue->try_dequeue(inst))
+    while (true)
     {
+        if (m_instQueue.empty())
+            break;
+
+        inst = m_instQueue.front();
+        m_instQueue.pop();
         if (m_instances[inst].available())
         {
             uri = "http://" + inst;
             if (m_instances[inst].weight_int() >= m_instCount[inst])
             {
-                bool result = m_instQueue->enqueue(*m_queueToken, inst);
+                m_instQueue.push(inst);
                 break;
             }
         }
@@ -71,6 +72,7 @@ void Service::set(std::map<std::string, ST_INSTANCE>& instances)
         }
     }
 
+    std::unique_lock<std::mutex> lck(m_mtx);
     for (auto& item : instances)
     {
         m_instances[item.first] = item.second;
@@ -81,7 +83,7 @@ void Service::set(std::map<std::string, ST_INSTANCE>& instances)
         int weight = item.second.weight_int() - m_instCount[item.first];
         for (int i = 0; i < weight; i++)
         {
-            bool result = m_instQueue->enqueue(*m_queueToken, item.first);
+            m_instQueue.push(item.first);
             m_instCount[item.first]++;
         }
     }
