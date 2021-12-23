@@ -95,19 +95,16 @@ void NacosImpl::setLogger(std::function<void(int level, std::string log)> logger
     m_logger = logger;
 }
 
-void NacosImpl::listServices()
+std::map<std::string, std::map<std::string, bool>> NacosImpl::listServices()
 {
+    std::map<std::string, std::map<std::string, bool>> svcs;
     for (auto& ms : m_services)
     {
-        if (m_logger)
-                m_logger(40000, ms.first + ":");
-        std::vector<std::pair<std::string, bool> > mss = ms.second->gets();
-        for (size_t i = 0; i < mss.size(); i++)
-        {
-            if (m_logger)
-                m_logger(40000, "   " + mss[i].first + (mss[i].second ? "   true" : "  false"));
-        }
+        std::map<std::string, bool> mss = ms.second->gets();
+        for (auto& inst : mss)
+            svcs[ms.first][inst.first] = inst.second;
     }
+    return svcs;
 }
 
 static size_t easy_read_cb(void* ptr, size_t size, size_t nmemb, void* userp)

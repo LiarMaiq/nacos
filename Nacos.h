@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <string>
 #include <functional>
 
@@ -14,9 +15,7 @@ public:
 
 public:
     int init();
-    // size_t pushService(const std::string& service, std::list<nacos::Instance>& instances);
     std::string require(const std::string service);
     void setLogger(std::function<void(int level, std::string log)> logger);
-    // print current services list
-    void listServices();
+    std::map<std::string, std::map<std::string, bool>> listServices();
 };

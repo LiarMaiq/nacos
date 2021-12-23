@@ -18,14 +18,14 @@ void Service::setName(const std::string name)
     m_name = name;
 }
 
-std::vector<std::pair<std::string, bool> > Service::gets()
+std::map<std::string, bool> Service::gets()
 {
-    std::vector<std::pair<std::string, bool> > mss;
+    std::map<std::string, bool> mss;
     std::unordered_map<std::string, ST_INSTANCE> insts = m_instances;
     for (auto& item : insts)
     {
         std::string addr = "http://" + item.second.handle();
-        mss.push_back({ addr,item.second.available() });
+        mss[addr] = item.second.available();
     }
     return mss;
 }

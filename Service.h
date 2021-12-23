@@ -18,7 +18,7 @@ public:
 	void setName(const std::string name);
     std::string get();
     void set(std::map<std::string, ST_INSTANCE>& instances);
-    std::vector<std::pair<std::string, bool> > gets();
+    std::map<std::string, bool> gets();
 
 private:
     std::string m_name;

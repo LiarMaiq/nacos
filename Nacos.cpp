@@ -31,10 +31,12 @@ void Nacos::setLogger(std::function<void(int level, std::string log)> logger)
         _g_nacos_impl->setLogger(logger);
 }
 
-void Nacos::listServices()
+std::map<std::string, std::map<std::string, bool>> Nacos::listServices()
 {
+    std::map<std::string, std::map<std::string, bool>> svcs;
     if (_g_nacos_impl)
-        _g_nacos_impl->listServices();
+        svcs = _g_nacos_impl->listServices();
+    return svcs;
 }
 
 std::string Nacos::require(const std::string service)
