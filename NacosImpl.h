@@ -1,8 +1,7 @@
 #pragma once
 #include <vector>
-#include <map>
 #include <future>
-#include <string>
+#include "Nacos.h"
 
 class Service;
 
@@ -67,11 +66,11 @@ struct ST_INSTANCE
     }
 };
 
-class NacosImpl
+class Nacos::Impl
 {
 public:
-    NacosImpl();
-    ~NacosImpl();
+    Impl();
+    ~Impl();
 
 public:
     int init();

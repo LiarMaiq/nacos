@@ -9,14 +9,14 @@
 #include "curl/curl.h"
 #include <fstream>
 
-NacosImpl::NacosImpl()
+Nacos::Impl::Impl()
 {
     m_stopping = false;
     m_curlBeat = 0;
     m_curlList = 0;
 }
 
-NacosImpl::~NacosImpl()
+Nacos::Impl::~Impl()
 {
     m_stopping = true;
     m_future.wait();
@@ -30,7 +30,7 @@ NacosImpl::~NacosImpl()
         delete item.second;
 }
 
-int NacosImpl::init()
+int Nacos::Impl::init()
 {
     curl_global_init(CURL_GLOBAL_ALL);
     m_curlBeat = curl_easy_init();
@@ -90,12 +90,12 @@ int NacosImpl::init()
     return 0;// In release no return will get "double free or corruption (fasttop)" error
 }
 
-void NacosImpl::setLogger(std::function<void(int level, std::string log)> logger)
+void Nacos::Impl::setLogger(std::function<void(int level, std::string log)> logger)
 {
     m_logger = logger;
 }
 
-std::map<std::string, std::map<std::string, bool>> NacosImpl::listServices()
+std::map<std::string, std::map<std::string, bool>> Nacos::Impl::listServices()
 {
     std::map<std::string, std::map<std::string, bool>> svcs;
     for (auto& ms : m_services)
@@ -126,7 +126,7 @@ size_t easy_write_cb(void* data, size_t size, size_t count, void* userp) {
     return n;
 }
 
-void NacosImpl::run()
+void Nacos::Impl::run()
 {
     curl_easy_setopt(m_curlBeat, CURLOPT_UPLOAD, 1);
     curl_easy_setopt(m_curlBeat, CURLOPT_READFUNCTION, easy_read_cb);
@@ -186,7 +186,7 @@ void NacosImpl::run()
     }
 }
 
-std::string NacosImpl::require(const std::string service)
+std::string Nacos::Impl::require(const std::string service)
 {
     if (service.empty())
         return "";
@@ -232,7 +232,7 @@ std::string NacosImpl::require(const std::string service)
     "useSpecifiedURL":false
 }
 */
-void NacosImpl::getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances)
+void Nacos::Impl::getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances)
 {
     for (const auto &item : m_addrs)
     {

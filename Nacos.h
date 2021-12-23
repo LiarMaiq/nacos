@@ -18,4 +18,8 @@ public:
     std::string require(const std::string service);
     void setLogger(std::function<void(int level, std::string log)> logger);
     std::map<std::string, std::map<std::string, bool>> listServices();
+
+private:
+    class Impl;
+    Impl* m_impl;
 };
