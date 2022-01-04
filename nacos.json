@@ -1,6 +1,11 @@
 {
   "addrs": [ "10.29.195.12:8847", "10.29.195.12:8848" ],
   "interval": 10,
+  "login": {
+    "path": "/nacos/v1/auth/login",
+    "username": "nacos",
+    "password": "nacos"
+  },
   "beat": {
     "enable": true,
     "path": "/nacos/v1/ns/instance/beat",

@@ -67,6 +67,10 @@ int Nacos::Impl::init()
     m_cfg.interval = jCfg["interval"];
     m_cfg.interval = m_cfg.interval < 1 ? 10 : m_cfg.interval;
 
+    m_cfg.login.path = jCfg["login"]["path"].get<std::string>();
+    m_cfg.login.username = jCfg["login"]["username"].get<std::string>();
+    m_cfg.login.password = jCfg["login"]["password"].get<std::string>();
+
     m_cfg.beat.enable = jCfg["beat"]["enable"];
     if (m_cfg.beat.enable)
     {
@@ -128,7 +132,6 @@ size_t easy_write_cb(void* data, size_t size, size_t count, void* userp) {
 
 void Nacos::Impl::run()
 {
-    curl_easy_setopt(m_curlBeat, CURLOPT_UPLOAD, 1);
     curl_easy_setopt(m_curlBeat, CURLOPT_READFUNCTION, easy_read_cb);
     curl_easy_setopt(m_curlBeat, CURLOPT_READDATA, 0);
     curl_easy_setopt(m_curlBeat, CURLOPT_WRITEFUNCTION, easy_write_cb);
@@ -138,6 +141,9 @@ void Nacos::Impl::run()
     //curl_easy_setopt(e, CURLOPT_HEADERDATA, (void*)ctx);
     curl_easy_setopt(m_curlList, CURLOPT_WRITEFUNCTION, easy_write_cb);
 
+    // login
+    login();
+
     while (!m_stopping)
     {
         // beat
@@ -146,15 +152,17 @@ void Nacos::Impl::run()
             for (const std::string &item : m_cfg.addrs)
             {
                 std::string u = "http://" + item + m_cfg.beat.path;
-                u += "?serviceName=" + m_cfg.beat.queries["serviceName"];
+                u += "?accessToken=" + m_token;
+                u += "&serviceName=" + m_cfg.beat.queries["serviceName"];
                 u += "&beat=" + m_cfg.beat.queries["beat"];
                 u += "&ephemeral=" + m_cfg.beat.queries["ephemeral"];
                 if (!m_cfg.beat.queries["groupName"].empty())
                     u += "&groupName=" + m_cfg.beat.queries["groupName"];
 
+                curl_easy_setopt(m_curlBeat, CURLOPT_UPLOAD, 1);
                 curl_easy_setopt(m_curlBeat, CURLOPT_URL, u.c_str());
                 std::string body;
-                curl_easy_setopt(m_curlList, CURLOPT_WRITEDATA, (void*)&body);
+                curl_easy_setopt(m_curlBeat, CURLOPT_WRITEDATA, (void*)&body);
 
                 CURLcode res;
                 int statusCodes = 0;
@@ -163,6 +171,8 @@ void Nacos::Impl::run()
                     curl_easy_getinfo(m_curlBeat, CURLINFO_RESPONSE_CODE, &statusCodes);
                 if (statusCodes == 200)
                     m_addrs[item] = true;
+                else if (statusCodes == 403)
+                    login();
 
                 if (m_logger && statusCodes != 200)
                     m_logger(30000, "Nacos code:" + std::to_string(statusCodes) + " msg:" + body);
@@ -241,7 +251,8 @@ void Nacos::Impl::getInstances(const std::string service, std::map<std::string, 
             continue;
 
         std::string u = "http://" + item.first + m_cfg.list.path;
-        u += "?serviceName=" + service;
+        u += "?accessToken=" + m_token;
+        u += "&serviceName=" + service;
         u += "&healthyOnly=true";
         if (!m_cfg.list.queries["groupName"].empty())
             u += "&groupName=" + m_cfg.list.queries["groupName"];
@@ -323,6 +334,37 @@ void Nacos::Impl::getInstances(const std::string service, std::map<std::string, 
                 }
                 else
                     instances[inst.handle()] = inst;
+            }
+        }
+    }
+}
+
+void Nacos::Impl::login()
+{
+    for (const std::string& item : m_cfg.addrs)
+    {
+        std::string u = "http://" + item + m_cfg.login.path;
+
+        curl_easy_setopt(m_curlBeat, CURLOPT_POST, 1L);
+        curl_easy_setopt(m_curlBeat, CURLOPT_URL, u.c_str());
+        std::string body;
+        curl_easy_setopt(m_curlBeat, CURLOPT_WRITEDATA, (void*)&body);
+        std::string data = "username=" + m_cfg.login.username + "&password=" + m_cfg.login.password;
+        curl_easy_setopt(m_curlBeat, CURLOPT_POSTFIELDS, data.c_str());
+        curl_easy_setopt(m_curlBeat, CURLOPT_POSTFIELDSIZE, data.size());
+
+        CURLcode res;
+        int statusCodes = 0;
+        res = curl_easy_perform(m_curlBeat);
+        if (res == CURLcode::CURLE_OK)
+            curl_easy_getinfo(m_curlBeat, CURLINFO_RESPONSE_CODE, &statusCodes);
+        if (statusCodes == 200)
+        {
+            nlohmann::json jBody = nlohmann::json::parse(body, nullptr, false, true);
+            if (jBody != nlohmann::json::value_t::discarded)
+            {
+                m_token = jBody["accessToken"].get<std::string>();
+                break;
             }
         }
     }
