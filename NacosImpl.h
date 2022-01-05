@@ -1,6 +1,9 @@
 #pragma once
 #include <vector>
+#include <mutex>
 #include <future>
+#include <unordered_map>
+#include <deque>
 #include "Nacos.h"
 
 class Service;
@@ -14,6 +17,9 @@ struct ST_NACOS_BEAT
 
 struct ST_NACOS_LIST
 {
+    // 服务刷新深度，表示有多少个服务会定期从服务端拉取最新的实例信息
+    // 服务按照最近调用的顺序排序
+    int refreshDepth;
     std::string path;               // uri
     std::map<std::string, std::string> queries;
 };
@@ -90,16 +96,23 @@ protected:
     void run();
     void getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances);
     void login();
+    void beat();
+    void pushLog(const int& level, const std::string& log);
 
 private:
     void* m_curlBeat;
     void* m_curlList;
+    void* m_curlLogin;
     std::future<void> m_future;
     // Service name -> Service*
-    std::map<std::string, Service*> m_services;
+    std::unordered_map<std::string, Service*> m_services;
+    // The list of recent called service
+    std::deque<std::string> m_recentServices;
     bool m_stopping;
     std::function<void(int level, std::string log)> m_logger;
     ST_NACOS_CFG m_cfg;
     std::map<std::string, bool> m_addrs;
     std::string m_token;
+    std::mutex m_mtxCurlList;
+    std::mutex m_mtxRequire;
 };

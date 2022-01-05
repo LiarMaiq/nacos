@@ -2,7 +2,6 @@
 #include <unordered_map>
 #include <vector>
 #include <atomic>
-#include <mutex>
 #include <queue>
 #include "nlohmann/json.hpp"
 #include "NacosImpl.h"

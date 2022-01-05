@@ -25,6 +25,7 @@
     }
   },
   "list": {
+    "refreshDepth": 3,
     "path": "/nacos/v1/ns/instance/list",
     "queries": {
       "groupName": "",
