@@ -39,7 +39,8 @@ Nacos::Impl::Impl()
 Nacos::Impl::~Impl()
 {
     m_stopping = true;
-    m_future.wait();
+    m_futureBeat.wait();
+    m_futureList.wait();
 
     if (m_curlBeat)
         curl_easy_cleanup(m_curlBeat);
@@ -84,13 +85,12 @@ int Nacos::Impl::init()
     for (auto& addr : jCfg["addrs"])
         m_cfg.addrs.push_back(addr.get<std::string>());
 
-    m_cfg.interval = jCfg["interval"];
-    m_cfg.interval = m_cfg.interval < 1 ? 10 : m_cfg.interval;
-
     m_cfg.login.path = jCfg["login"]["path"].get<std::string>();
     m_cfg.login.username = jCfg["login"]["username"].get<std::string>();
     m_cfg.login.password = jCfg["login"]["password"].get<std::string>();
 
+    m_cfg.beat.interval = jCfg["beat"]["interval"];
+    m_cfg.beat.interval = m_cfg.beat.interval < 1 ? 10 : m_cfg.beat.interval;
     m_cfg.beat.enable = jCfg["beat"]["enable"];
     if (m_cfg.beat.enable)
     {
@@ -105,6 +105,8 @@ int Nacos::Impl::init()
     }
 
     m_cfg.list.path = jCfg["list"]["path"];
+    m_cfg.list.interval = jCfg["list"]["interval"];
+    m_cfg.list.interval = m_cfg.list.interval < 1 ? 10 : m_cfg.list.interval;
     m_cfg.list.refreshDepth = jCfg["list"]["refreshDepth"].get<int>();
     m_cfg.list.refreshDepth = m_cfg.list.refreshDepth < 0 ? 3 : m_cfg.list.refreshDepth;
     m_cfg.list.queries["groupName"] = jCfg["list"]["queries"]["groupName"].get<std::string>();
@@ -127,7 +129,8 @@ int Nacos::Impl::init()
     login();
 
     // run
-    m_future = std::async(std::launch::async, [this]()->void{this->run();});
+    m_futureBeat = std::async(std::launch::async, [this]()->void {this->funcBeat(); });
+    m_futureList = std::async(std::launch::async, [this]()->void {this->funcList(); });
 
     return 0;// In release no return will get "double free or corruption (fasttop)" error
 }
@@ -149,30 +152,28 @@ std::map<std::string, std::map<std::string, bool>> Nacos::Impl::listServices()
     return svcs;
 }
 
-void Nacos::Impl::run()
+void Nacos::Impl::funcBeat()
 {
     while (!m_stopping)
     {
-        // beat
         beat();
-
-        // 仅刷新最近调用的N个服务
-        for (int i = 0; i < m_cfg.list.refreshDepth; i++)
-        {
-            std::string svc = m_recentServices[i];
-            if (!svc.empty())
-            {
-                std::map<std::string, ST_INSTANCE> instances;
-                getInstances(svc, instances);
-                m_services[svc]->set(instances);
-            }
-        }
-        
-        //
 #ifdef _WIN32
-        Sleep(m_cfg.interval * 1000);
+        Sleep(m_cfg.beat.interval * 1000);
 #else
-        usleep(m_cfg.interval * 1000000);
+        usleep(m_cfg.beat.interval * 1000000);
+#endif
+    }
+}
+
+void Nacos::Impl::funcList()
+{
+    while (!m_stopping)
+    {
+        list();
+#ifdef _WIN32
+        Sleep(m_cfg.list.interval * 1000);
+#else
+        usleep(m_cfg.list.interval * 1000000);
 #endif
     }
 }
@@ -385,9 +386,6 @@ void Nacos::Impl::beat()
 
     for (const std::string& item : m_cfg.addrs)
     {   
-        // Reset addr status
-        m_addrs[item] = false;
-
         std::string u = "http://" + item + m_cfg.beat.path;
         u += "?accessToken=" + m_token;
         u += "&serviceName=" + m_cfg.beat.queries["serviceName"];
@@ -407,26 +405,43 @@ void Nacos::Impl::beat()
         if (res == CURLcode::CURLE_OK)
         {
             res = curl_easy_getinfo(m_curlBeat, CURLINFO_RESPONSE_CODE, &statusCodes);
-            if (res != CURLcode::CURLE_OK)
+            if (res == CURLcode::CURLE_OK)
             {
+                if (statusCodes == 200)
+                {
+                    m_addrs[item] = true;
+                    break;
+                }
+                else if (statusCodes == 403)
+                {
+                    login();
+                }
+
+                pushLog(30000, "Nacos code:" + std::to_string(statusCodes) + " msg:" + body);
+            }
+            else
                 pushLog(30000, "Curl code:" + std::to_string(res) + " msg:" + body);
-                continue;
-            }
-
-            if (statusCodes == 200)
-            {
-                m_addrs[item] = true;
-                break;
-            }
-            else if (statusCodes == 403)
-            {
-                login();
-            }
-
-            pushLog(30000, "Nacos code:" + std::to_string(statusCodes) + " msg:" + body);
         }
         else
             pushLog(30000, "Curl code:" + std::to_string(res) + " msg:" + body);
+
+        // Reset addr status
+        m_addrs[item] = false;
+    }
+}
+
+void Nacos::Impl::list()
+{
+    // 仅刷新最近调用的N个服务
+    for (int i = 0; i < m_cfg.list.refreshDepth; i++)
+    {
+        std::string svc = m_recentServices[i];
+        if (!svc.empty())
+        {
+            std::map<std::string, ST_INSTANCE> instances;
+            getInstances(svc, instances);
+            m_services[svc]->set(instances);
+        }
     }
 }
 

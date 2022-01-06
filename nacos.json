@@ -1,6 +1,5 @@
 {
   "addrs": [ "10.29.195.12:8847", "10.29.195.12:8848" ],
-  "interval": 10,
   "login": {
     "path": "/nacos/v1/auth/login",
     "username": "nacos",
@@ -8,6 +7,7 @@
   },
   "beat": {
     "enable": true,
+    "interval": 10,
     "path": "/nacos/v1/ns/instance/beat",
     "queries": {
       "serviceName": "doge-100",
@@ -25,6 +25,7 @@
     }
   },
   "list": {
+    "interval": 10,
     "refreshDepth": 3,
     "path": "/nacos/v1/ns/instance/list",
     "queries": {

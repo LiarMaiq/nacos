@@ -11,6 +11,7 @@ class Service;
 struct ST_NACOS_BEAT
 {
     bool enable;                    // beat or not
+    int interval;                   // second
     std::string path;               // uri
     std::map<std::string, std::string> queries;
 };
@@ -20,6 +21,7 @@ struct ST_NACOS_LIST
     // 服务刷新深度，表示有多少个服务会定期从服务端拉取最新的实例信息
     // 服务按照最近调用的顺序排序
     int refreshDepth;
+    int interval;                   // second
     std::string path;               // uri
     std::map<std::string, std::string> queries;
 };
@@ -34,7 +36,6 @@ struct ST_NACOS_LOGIN
 struct ST_NACOS_CFG
 {
     std::vector<std::string> addrs; // 10.29.195.12:8847
-    int interval;                   // second
     ST_NACOS_LOGIN login;
     ST_NACOS_BEAT beat;
     ST_NACOS_LIST list;
@@ -93,17 +94,20 @@ public:
     std::map<std::string, std::map<std::string, bool>> listServices();
 
 protected:
-    void run();
+    void funcBeat();
+    void funcList();
     void getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances);
     void login();
     void beat();
+    void list();
     void pushLog(const int& level, const std::string& log);
 
 private:
     void* m_curlBeat;
     void* m_curlList;
     void* m_curlLogin;
-    std::future<void> m_future;
+    std::future<void> m_futureBeat;
+    std::future<void> m_futureList;
     // Service name -> Service*
     std::unordered_map<std::string, Service*> m_services;
     // The list of recent called service
