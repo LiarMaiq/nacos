@@ -1,27 +1,27 @@
-#include "Service.h"
+#include "NacosService.h"
 
-Service::Service()
+NacosService::NacosService()
 {
 }
 
-Service::~Service()
+NacosService::~NacosService()
 {
 }
 
-const std::string Service::name()
+const std::string NacosService::name()
 {
     return m_name;
 }
 
-void Service::setName(const std::string name)
+void NacosService::setName(const std::string name)
 {
     m_name = name;
 }
 
-std::map<std::string, bool> Service::gets()
+std::map<std::string, bool> NacosService::gets()
 {
     std::map<std::string, bool> mss;
-    std::unordered_map<std::string, ST_INSTANCE> insts = m_instances;
+    std::unordered_map<std::string, NacosInstance> insts = m_instances;
     for (auto& item : insts)
     {
         std::string addr = "http://" + item.second.handle();
@@ -30,7 +30,7 @@ std::map<std::string, bool> Service::gets()
     return mss;
 }
 
-std::string Service::get()
+std::string NacosService::get()
 {
     std::unique_lock<std::mutex> lck(m_mtx);
     std::string uri;
@@ -60,7 +60,7 @@ std::string Service::get()
  * 更新服务实例列表
  * @param instances 当前该服务全部可用实例，因此不存在于其中的实例已不可用
  */
-void Service::set(std::map<std::string, ST_INSTANCE>& instances)
+void NacosService::set(std::map<std::string, NacosInstance>& instances)
 {
     for (auto& item : m_instances)
     {

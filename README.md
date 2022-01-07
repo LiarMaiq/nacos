@@ -14,7 +14,7 @@ A simple and very easy to use Alibaba Nacos C++ client.
 使用 Virtual Studio Community 2019 构建：
 1. 获取 vcpkg `$ git clone https://github.com/microsoft/vcpkg.git`，并安装依赖的库：
     ```
-    $ vcpkg install lincurl
+    $ vcpkg install libcurl
     ```
 2. 使用 Virtual Studio Community 2019 打开文件夹，选择配置构建即可，目前有4个配置：
     - x64-Debug（Windows）

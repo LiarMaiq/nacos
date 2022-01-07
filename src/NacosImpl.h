@@ -5,8 +5,9 @@
 #include <unordered_map>
 #include <deque>
 #include "Nacos.h"
+#include "NacosInstance.h"
 
-class Service;
+class NacosService;
 
 struct ST_NACOS_BEAT
 {
@@ -41,46 +42,6 @@ struct ST_NACOS_CFG
     ST_NACOS_LIST list;
 };
 
-struct ST_INSTANCE
-{
-    std::string ip;
-    int port;
-    bool enabled;
-    bool healthy;
-    bool valid;
-    bool ephemeral;
-    bool marked;
-    std::string metadata;   // json
-    std::string instanceId;
-    std::string serviceName;
-    std::string clusterName;
-    double weight;
-
-    bool operator==(const ST_INSTANCE& inst) const
-    {
-        return (inst.ip == this->ip) && (inst.port == this->port);
-    }
-    bool operator!=(const ST_INSTANCE& inst) const
-    {
-        return !(this->operator==(inst));
-    }
-
-    std::string handle()
-    {
-        return ip + ":" + std::to_string(port);
-    }
-
-    int weight_int()
-    {
-        return (int)(weight * 100);
-    }
-
-    bool available()
-    {
-        return healthy & enabled & valid & (port > 0) & (!ip.empty());
-    }
-};
-
 class Nacos::Impl
 {
 public:
@@ -96,7 +57,7 @@ public:
 protected:
     void funcBeat();
     void funcList();
-    void getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances);
+    void getInstances(const std::string service, std::map<std::string, NacosInstance>& instances);
     void login();
     void beat();
     void list();
@@ -109,7 +70,7 @@ private:
     std::future<void> m_futureBeat;
     std::future<void> m_futureList;
     // Service name -> Service*
-    std::unordered_map<std::string, Service*> m_services;
+    std::unordered_map<std::string, NacosService*> m_services;
     // The list of recent called service
     std::deque<std::string> m_recentServices;
     bool m_stopping;

@@ -1,5 +1,5 @@
 #include "NacosImpl.h"
-#include "Service.h"
+#include "NacosService.h"
 #if defined(_WIN32)
 #include <Windows.h>
 #else
@@ -195,9 +195,9 @@ std::string Nacos::Impl::require(const std::string service)
     auto iter = m_services.find(service);
     if (iter == m_services.end())
     {
-        std::map<std::string, ST_INSTANCE> instances;
+        std::map<std::string, NacosInstance> instances;
         getInstances(service, instances);
-        m_services[service] = new Service();
+        m_services[service] = new NacosService();
         m_services[service]->setName(service);
         m_services[service]->set(instances);
     }
@@ -233,7 +233,7 @@ std::string Nacos::Impl::require(const std::string service)
     "useSpecifiedURL":false
 }
 */
-void Nacos::Impl::getInstances(const std::string service, std::map<std::string, ST_INSTANCE>& instances)
+void Nacos::Impl::getInstances(const std::string service, std::map<std::string, NacosInstance>& instances)
 {
     std::unique_lock<std::mutex> lck(m_mtxCurlList);
     for (const auto &item : m_addrs)
@@ -267,7 +267,7 @@ void Nacos::Impl::getInstances(const std::string service, std::map<std::string, 
         if (statusCodes != 200)
             continue;
 
-        ST_INSTANCE inst;
+        NacosInstance inst;
         if (body.empty())
             continue;
 
@@ -438,7 +438,7 @@ void Nacos::Impl::list()
         std::string svc = m_recentServices[i];
         if (!svc.empty())
         {
-            std::map<std::string, ST_INSTANCE> instances;
+            std::map<std::string, NacosInstance> instances;
             getInstances(svc, instances);
             m_services[svc]->set(instances);
         }

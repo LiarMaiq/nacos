@@ -1,28 +1,28 @@
 #pragma once
 #include <unordered_map>
-#include <vector>
-#include <atomic>
 #include <queue>
+#include <atomic>
+#include <mutex>
 #include "nlohmann/json.hpp"
-#include "NacosImpl.h"
+#include "NacosInstance.h"
 
-class Service
+class NacosService
 {
 public:
-    Service();
-    ~Service();
+    NacosService();
+    ~NacosService();
 
 public:
     const std::string name();
 	void setName(const std::string name);
     std::string get();
-    void set(std::map<std::string, ST_INSTANCE>& instances);
+    void set(std::map<std::string, NacosInstance>& instances);
     std::map<std::string, bool> gets();
 
 private:
     std::string m_name;
     // instance handle -> instance
-    std::unordered_map<std::string, ST_INSTANCE> m_instances;
+    std::unordered_map<std::string, NacosInstance> m_instances;
     // instance handle -> instance count in queue
     std::unordered_map<std::string, std::atomic_int> m_instCount;
     //
